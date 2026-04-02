@@ -59,7 +59,13 @@ def load_and_clean(filepath):
     # TODO 1: Load the CSV file and perform all cleaning steps
     # Drop rows missing CustomerID, filter out non-positive Quantity/UnitPrice,
     # add TotalPrice, and parse dates.
-    pass  # Replace with your implementation
+
+    df = pd.read_csv(filepath)
+    df = df.dropna(subset=['CustomerID'])
+    df = df[(df['Quantity'] > 0) & (df['UnitPrice'] > 0)]
+    df['TotalPrice'] = df['Quantity'] * df['UnitPrice']
+    df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
+    return df
 
 
 # ============================================================
@@ -84,13 +90,23 @@ def build_rfm(df, reference_date=None):
         One row per customer with columns: CustomerID, Recency, Frequency, Monetary
     """
     # TODO 2: Calculate the reference date if not provided
-    pass  # Replace with your implementation
+    if reference_date is None:
+        reference_date = df['InvoiceDate'].max() + pd.Timedelta(days=1)
+
 
     # TODO 3: Group by CustomerID and compute:
     #   - Recency: days between reference_date and the customer's last purchase
     #   - Frequency: number of unique invoices
     #   - Monetary: total spending (sum of TotalPrice)
-    pass  # Replace with your implementation
+    rfm = df.groupby('CustomerID').agg(
+        Recency=('InvoiceDate', lambda x: (reference_date - x.max()).days),
+        Frequency=('InvoiceNo', 'nunique'),
+        Monetary=('TotalPrice', 'sum')
+    ).reset_index()
+
+    return rfm
+
+
 
 
 # ============================================================
@@ -113,7 +129,9 @@ def scale_features(rfm_df):
     """
     # TODO 4: Create a StandardScaler, fit it on the three RFM columns,
     # and return the scaled data along with the scaler.
-    pass  # Replace with your implementation
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(rfm_df[['Recency', 'Frequency', 'Monetary']])
+    return scaled_data, scaler
 
 
 # ============================================================
@@ -138,7 +156,14 @@ def find_optimal_k(scaled_data, k_range=range(2, 9)):
     #   - inertia (km.inertia_)
     #   - silhouette score (silhouette_score(scaled_data, km.labels_))
     # Return as a DataFrame.
-    pass  # Replace with your implementation
+    results = []
+    for k in k_range:
+        km = KMeans(n_clusters=k, random_state=42, n_init=10)
+        labels = km.fit_predict(scaled_data)
+        inertia = km.inertia_
+        silhouette = silhouette_score(scaled_data, labels)
+        results.append({'K': k, 'Inertia': inertia, 'Silhouette': silhouette})
+    return pd.DataFrame(results)
 
 
 def run_kmeans(scaled_data, n_clusters):
@@ -156,7 +181,9 @@ def run_kmeans(scaled_data, n_clusters):
         Fitted KMeans model.
     """
     # TODO 6: Create and fit a KMeans model. Use random_state=42, n_init=10.
-    pass  # Replace with your implementation
+    km = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    km.fit(scaled_data)
+    return km
 
 
 # ============================================================
@@ -176,7 +203,19 @@ def plot_elbow_and_silhouette(results_df):
     #   Left: K vs Inertia (elbow plot)
     #   Right: K vs Silhouette Score
     # Label axes and add titles.
-    pass  # Replace with your implementation
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    axes[0].plot(results_df['K'], results_df['Inertia'], marker='o')
+    axes[0].set_title('Elbow Method')
+    axes[0].set_xlabel('Number of Clusters (K)')
+    axes[0].set_ylabel('Inertia')
+    axes[1].plot(results_df['K'], results_df['Silhouette'], marker='o')
+    axes[1].set_title('Silhouette Score')
+    axes[1].set_xlabel('Number of Clusters (K)')
+    axes[1].set_ylabel('Silhouette Score')
+    plt.tight_layout()
+    plt.show
+
+
 
 
 def plot_clusters_2d(scaled_data, labels, rfm_df):
