@@ -248,7 +248,7 @@ def plot_clusters_2d(scaled_data, labels, rfm_df):
 # PART F: AI-Powered Persona Generator
 # ============================================================
 
-def generate_persona(cluster_stats, cluster_id, client, model='gemini-2.0-flash'):
+def generate_persona(cluster_stats, cluster_id, client, model='gemini-2.5-flash'):
     """
     Use Gemini to generate a marketing persona for a customer cluster.
 
@@ -270,7 +270,26 @@ def generate_persona(cluster_stats, cluster_id, client, model='gemini-2.0-flash'
     #   - A catchy persona name
     #   - A 2-3 sentence behavioral description
     #   - 2-3 marketing recommendations for this segment
-    pass  # Replace with your implementation
+    
+    recency = cluster_stats.get('Recency_Mean', cluster_stats.get('Recency'))
+    frequency = cluster_stats.get('Frequency_Mean', cluster_stats.get('Frequency'))
+    monetary = cluster_stats.get('Monetary_Mean', cluster_stats.get('Monetary'))
+    count = cluster_stats.get('Count', 0)
+    
+    prompt = f"""Cluster {cluster_id} Summary:
+    - Recency: {recency:.2f}
+    - Frequency: {frequency:.2f}
+    - Monetary: {monetary:.2f}
+    - Size: {count:.0f} customers
+
+    Please generate a creative customer persona for this segment.
+    Include:
+    1. A catchy persona name
+    2. A 2-3 sentence behavioral description
+    3. 2-3 marketing recommendations for how to best engage this segment.
+    """
+    response = client.models.generate_content(model=model, contents=prompt)
+    return response.text.strip()
 
 
 # ============================================================
@@ -291,7 +310,7 @@ class SegmentationEngine:
         Gemini model name.
     """
 
-    def __init__(self, filepath, api_key=None, model='gemini-2.0-flash'):
+    def __init__(self, filepath, api_key=None, model='gemini-2.5-flash'):
         self.filepath = filepath
         self.model = model
         self.api_key = api_key or os.environ.get('GOOGLE_API_KEY')
@@ -342,7 +361,21 @@ class SegmentationEngine:
         #   5. Run K-means (store in self.kmeans_model)
         #   6. Add cluster labels to self.rfm_df
         #   7. Print a summary of results
-        pass  # Replace with your implementation
+        self.raw_df = pd.read_csv(self.filepath)
+        self.clean_df = load_and_clean(self.filepath)
+        self.rfm_df = build_rfm(self.clean_df)
+        self.scaled_data, self.scaler = scale_features(self.rfm_df)
+        if n_clusters is None:
+            self.k_results = find_optimal_k(self.scaled_data)
+        self.kmeans_model = KMeans(n_clusters=n_clusters, random_state=42)
+        self.kmeans_model.fit(self.scaled_data)
+        self.rfm_df['Cluster'] = self.kmeans_model.labels_
+        print(self.rfm_df.groupby('Cluster').agg(
+            Count=('Recency', 'count'),
+            Recency_Mean=('Recency', 'mean'),
+            Frequency_Mean=('Frequency', 'mean'),
+            Monetary_Mean=('Monetary', 'mean')
+        ).round(1))
 
     def generate_personas(self):
         """Generate AI personas for each cluster."""
