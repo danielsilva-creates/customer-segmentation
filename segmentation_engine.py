@@ -233,7 +233,15 @@ def plot_clusters_2d(scaled_data, labels, rfm_df):
     # TODO 8: Use PCA(n_components=2) to project the scaled data to 2D.
     # Create a scatter plot colored by cluster label.
     # Add axis labels showing variance explained, a legend, and a title.
-    pass  # Replace with your implementation
+    pca = PCA(n_components=2, random_state=42)
+    components = pca.fit_transform(scaled_data)
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(components[:, 0], components[:, 1], c=labels, cmap='Set2', alpha=0.6)
+    plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)')
+    plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)')
+    plt.title('Customer Segments (PCA Projection)')
+    plt.legend(*scatter.legend_elements(), title='Cluster')
+    plt.show()
 
 
 # ============================================================
